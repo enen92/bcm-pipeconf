@@ -28,6 +28,8 @@ public class PipeconfLoader {
     public static final String PIPELINE_APP_NAME = "org.stratumproject.bcm-pipeconf";
     private static final PiPipeconfId PIPECONF_ID =
             new PiPipeconfId("org.stratumproject.pipelines.bcm");
+    private static final PiPipeconfId PIPECONF_ID_BMV2 =
+            new PiPipeconfId("org.stratumproject.pipelines.bcm.bmv2");
 
     private static final Logger log =
             LoggerFactory.getLogger(PipeconfLoader.class.getName());
@@ -44,6 +46,7 @@ public class PipeconfLoader {
         // Registers all pipeconf at component activation.
         try {
             piPipeconfService.register(buildFpmPipeconf());
+            piPipeconfService.register(buildBmv2Pipeconf());
         } catch (FileNotFoundException e) {
             log.warn("Unable to register pipeconf {}: {}",
                      PIPELINE_APP_NAME, e.getMessage());
@@ -55,6 +58,9 @@ public class PipeconfLoader {
     protected void deactivate() {
         if (piPipeconfService.getPipeconf(PIPECONF_ID).isPresent()) {
             piPipeconfService.unregister(PIPECONF_ID);
+        }
+        if (piPipeconfService.getPipeconf(PIPECONF_ID_BMV2).isPresent()) {
+            piPipeconfService.unregister(PIPECONF_ID_BMV2);
         }
         log.info("Stopped");
     }
@@ -76,6 +82,26 @@ public class PipeconfLoader {
                 .addExtension(PiPipeconf.ExtensionType.P4_INFO_TEXT, p4InfoUrl)
                 .addExtension(PiPipeconf.ExtensionType.CPU_PORT_TXT, cpuPortUrl)
                 .addExtension(PiPipeconf.ExtensionType.STRATUM_FPM_BIN, fpmBinUrl)
+                .build();
+    }
+
+    private PiPipeconf buildBmv2Pipeconf() throws FileNotFoundException {
+        final URL p4InfoUrl = this.getClass().getResource("/p4info.txt");
+        final URL cpuPortUrl = this.getClass().getResource("/cpu-port.txt");
+        final URL bmv2jsonUrl = this.getClass().getResource("/bmv2.json");
+
+        checkFileExists(p4InfoUrl, "/p4info.txt");
+        checkFileExists(cpuPortUrl, "/cpu-port.txt");
+        checkFileExists(bmv2jsonUrl, "/bmv2.json");
+
+        return DefaultPiPipeconf.builder()
+                .withId(PIPECONF_ID_BMV2)
+                .withPipelineModel(parseP4Info(p4InfoUrl))
+                .addBehaviour(PiPipelineInterpreter.class, BcmPipelineInterpreter.class)
+                .addBehaviour(Pipeliner.class, BcmPipeliner.class)
+                .addExtension(PiPipeconf.ExtensionType.P4_INFO_TEXT, p4InfoUrl)
+                .addExtension(PiPipeconf.ExtensionType.BMV2_JSON, bmv2jsonUrl)
+                .addExtension(PiPipeconf.ExtensionType.CPU_PORT_TXT, cpuPortUrl)
                 .build();
     }
 

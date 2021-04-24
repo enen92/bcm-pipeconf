@@ -12,7 +12,7 @@ p4_src_dir := $(STRATUM_ROOT)/stratum/pipelines/main
 p4_build_dir := src/main/resources
 
 pipeconf_app_name := org.onosproject.stratum-bcm-pipeconf
-pipeconf_oar_file := $(shell ls -1 ${curr_dir}/target/stratum-bcm-pipeconf-*.oar 2> /dev/null)
+pipeconf_oar_file := $(shell ls -1 ${curr_dir}/target/bcm-pipeconf-*.oar 2> /dev/null)
 
 curr_dir_sha := $(shell echo -n "$(curr_dir)" | shasum | cut -c1-7)
 app_build_container_name := app-build-${curr_dir_sha}
@@ -48,8 +48,13 @@ fpm-bin:
 			--target_parser_map_file=p4src/standard_parser_map.pb.txt \
 			--slice_map_file=p4src/sliced_field_map.pb.txt
 	echo "253" > ${p4_build_dir}/cpu-port.txt
+	@echo "*** P4 program compiled successfully for BCM target! Output files are in ${p4_build_dir}"
+	docker run --rm -v ${curr_dir}:/workdir -w /workdir opennetworking/p4c:stable \
+		p4c-bm2-ss --arch v1model -o ${p4_build_dir}/bmv2.json \
+		--p4runtime-files ${p4_build_dir}/p4info.txt --Wdisable=unsupported \
+		p4src/main.p4
 	@rm -rf p4src
-	@echo "*** P4 program compiled successfully! Output files are in ${p4_build_dir}"
+	@echo "*** P4 program compiled successfully for BMV2 target! Output files are in ${p4_build_dir}"
 
 # Reuse the same container to persist mvn repo cache.
 _create_mvn_container:
@@ -87,4 +92,10 @@ netcfg:
 	$(info *** Pushing tofino-netcfg.json to ONOS at ${ONOS_HOST}...)
 	${onos_curl} -X POST -H 'Content-Type:application/json' \
 		${onos_url}/v1/network/configuration -d@./bcm-netcfg.json
+	@echo
+
+netcfg-bmv2:
+	$(info *** Pushing bcm-bmv2-netcfg.json to ONOS at ${ONOS_HOST}...)
+	${onos_curl} -X POST -H 'Content-Type:application/json' \
+		${onos_url}/v1/network/configuration -d@./bcm-bmv2-netcfg.json
 	@echo
